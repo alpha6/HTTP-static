@@ -13,9 +13,9 @@ use Data::Dumper;
 our $VERSION = '0.0.1';
 
 my $port = 8080;
-my $cwd = getcwd;
+my $cwd  = getcwd;
 
-GetOptions( 'port=i' => \$port);
+GetOptions( 'port=i' => \$port );
 
 # Создаем сокет
 socket( SOCK, PF_INET, SOCK_STREAM, getprotobyname('tcp') )
@@ -45,18 +45,22 @@ while ( my $client_addr = accept( CLIENT, SOCK ) ) {
 
     #Server reply content
     my $reply;
-    if ($req_data->{'req_uri'}) {
-      my $dest = File::Spec->catfile($cwd, $req_data->{'req_uri'});
-      unless (-e $dest) {
-        $reply = get_404();
-      }
-      if (-d $dest) {
-        $reply = get_dir_content($dest);
-      } else {
-        $reply = get_file_content($dest);
-      }
-    } else {
-      $reply = get_405();
+    if ( $req_data->{'req_uri'} ) {
+        my $dest = File::Spec->catfile( $cwd, $req_data->{'req_uri'} );
+        unless ( -e $dest ) {
+            $reply = get_404();
+        }
+        else {
+            if ( -d $dest ) {
+                $reply = get_dir_content($dest);
+            }
+            else {
+                $reply = get_file_content($dest);
+            }
+        }
+    }
+    else {
+        $reply = get_405();
     }
 
     # Отправляем данные клиенту
@@ -66,120 +70,117 @@ while ( my $client_addr = accept( CLIENT, SOCK ) ) {
     close(CLIENT);
 }
 
-
 sub parse_header {
-  my $header_str = shift;
+    my $header_str = shift;
 
-  #removing empty lines
-  $header_str =~ s/^(?:\015?\012)+//;
-  my @header = split /\015?\012/, $header_str; #Because \r\n isn't portable
+    #removing empty lines
+    $header_str =~ s/^(?:\015?\012)+//;
+    my @header = split /\015?\012/, $header_str;    #Because \r\n isn't portable
 
-  my $header_data = {};
+    my $header_data = {};
 
-  #Now accepting only GET method
-  if ($header[0] =~ m!^GET (/.*?) HTTP!) {
-      $header_data->{'req_uri'} = $1;
-  }
+    #Now accepting only GET method
+    if ( $header[0] =~ m!^GET (/.*?) HTTP! ) {
+        $header_data->{'req_uri'} = $1;
+    }
 
-  return $header_data;
+    return $header_data;
 }
 
 sub get_dir_content {
-  my $dest = shift;
+    my $dest = shift;
 
-  my $files = [];
-  my $reply = "Oooops!";
-  $dest =~ s!\/+!/!g;
+    my $files = [];
+    my $reply = "Oooops! Something wrong!";
+    $dest =~ s!\/+!/!g;
 
-  my $base = substr ($dest, length($cwd));
+    my $base = substr( $dest, length($cwd) );
 
-  eval {
-    opendir (my $D, $dest) or die $!;
-    for my $file (readdir $D) {
-      my $path = $base.'/'.$file;
-      $path =~ s!/+!/!g;
-      push @$files, { path => $path, fn => $file};
+    eval {
+        opendir( my $D, $dest ) or die $!;
+        for my $file ( readdir $D ) {
+            my $path = $base . '/' . $file;
+            $path =~ s!/+!/!g;
+            push @$files, { path => $path, fn => $file };
+        }
+        closedir $D;
+        $reply = _get_file_list($files);
+    };
+    if ($@) {
+        print STDERR "ERROR! [$@]";
+        return get_500($@);
     }
-    closedir $D;
-    $reply = _get_file_list($files);
-  };
-  if ($@) {
-    print STDERR "ERROR! [$@]";
-    return get_500($@);
-  }
 
-  return $reply;
+    return $reply;
 }
 
 sub get_file_content {
-  my $file = shift;
+    my $file = shift;
 
-  my $reply;
-  my $header = q~HTTP/1.0 200 OK
+    my $reply;
+    my $header = q~HTTP/1.0 200 OK
 Content-Type: application/octet-stream;
 
 ~;
 
-  my $buf;
-  eval {
-    open(my $fh, '<', $file) or die $!;
-    if (my $size = -s $fh) {
-                my ($pos, $read) = 0;
-                do {
-                        defined($read = read $fh, ${$buf}, $size - $pos, $pos) or croak "Couldn't read $file: $!";
-                        $pos += $read;
-                } while ($read && $pos < $size);
+    my $buf;
+    eval {
+        open( my $fh, '<', $file ) or die $!;
+        if ( my $size = -s $fh ) {
+            my ( $pos, $read ) = 0;
+            do {
+                defined( $read = read $fh, ${$buf}, $size - $pos, $pos )
+                  or croak "Couldn't read $file: $!";
+                $pos += $read;
+            } while ( $read && $pos < $size );
         }
         else {
-                $buf = do { local $/; <$fh> };
+            $buf = do { local $/; <$fh> };
         }
-  };
-  if ($@) {
-    print STDERR "ERROR! [$@]";
-    return get_500($@);
-  }
+    };
+    if ($@) {
+        print STDERR "ERROR! [$@]";
+        return get_500($@);
+    }
 
-  return sprintf('%s%s', $header,$$buf);
+    return sprintf( '%s%s', $header, $$buf );
 }
 
 sub _get_file_list {
-  my $files_list = shift;
+    my $files_list = shift;
 
-  my $header = q~HTTP/1.0 200 OK
+    my $header = q~HTTP/1.0 200 OK
 Content-Type: text/html;
 
 <html><head><style>.page-content { width: 400px; margin: 0 auto; border: 1px solid black; border-radius: 5px; padding: 5px 20px 30px } a {color: black } p { margin: 0; padding: 5px; } p:nth-child(even) {background: #D4F1D4}  </style></head><body><div class="page-content">~;
 
-  my $footer = q~</div></body></html>~;
+    my $footer = q~</div></body></html>~;
 
-  my $content;
-  for my $f (@$files_list) {
-    $content .= "<p><a href=$f->{'path'}>$f->{'fn'}</a></p>";
-  }
+    my $content;
+    for my $f (@$files_list) {
+        $content .= "<p><a href=$f->{'path'}>$f->{'fn'}</a></p>";
+    }
 
-  return $header.$content.$footer;
+    return $header . $content . $footer;
 }
 
 sub get_404 {
-  return q~HTTP/1.0 404 Not Found
-
+    return q~HTTP/1.0 404 Not Found
 
 File not found!
   ~;
 }
 
 sub get_405 {
-  return q~HTTP/1.0 405 Method Not Allowed
-
+    return q~HTTP/1.0 405 Method Not Allowed
 
 Only GET method is allowed!
   ~;
 }
 
 sub get_500 {
-  my $msg = shift;
-return qq~HTTP/1.0 404 Not Found
-
+    my $msg = shift;
+    return qq~HTTP/1.0 500 Internal server error
 
 Internal server error!
 $msg
