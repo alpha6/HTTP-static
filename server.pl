@@ -27,7 +27,7 @@ my $paddr = sockaddr_in( $port, INADDR_ANY );
 bind( SOCK, $paddr ) or die("Can't bind port!");
 
 # Ждем подключений клиентов
-print "Waiting for connections...\n";
+print "Waiting for connections ($port)...\n";
 listen( SOCK, SOMAXCONN );
 while ( my $client_addr = accept( CLIENT, SOCK ) ) {
 
@@ -48,8 +48,8 @@ while ( my $client_addr = accept( CLIENT, SOCK ) ) {
     if ($req_data->{'req_uri'}) {
       my $dest = File::Spec->catfile($cwd, $req_data->{'req_uri'});
       unless (-e $dest) {
-        $reply = get_404();   
-      } 
+        $reply = get_404();
+      }
       if (-d $dest) {
         $reply = get_dir_content($dest);
       } else {
@@ -79,8 +79,8 @@ sub parse_header {
   #Now accepting only GET method
   if ($header[0] =~ m!^GET (/.*?) HTTP!) {
       $header_data->{'req_uri'} = $1;
-  }  
-  
+  }
+
   return $header_data;
 }
 
@@ -107,7 +107,7 @@ sub get_dir_content {
     print STDERR "ERROR! [$@]";
     return get_500($@);
   }
-  
+
   return $reply;
 }
 
@@ -115,16 +115,15 @@ sub get_file_content {
   my $file = shift;
 
   my $reply;
-  my $header = q~ HTTP/1.0 200 OK
-Content-Type',"application/x-download;name=test.text
-
+  my $header = q~HTTP/1.0 200 OK
+Content-Type: application/octet-stream;
 
 ~;
-  
+
   my $buf;
   eval {
     open(my $fh, '<', $file) or die $!;
-    if (my $size = -s $fh) {      
+    if (my $size = -s $fh) {
                 my ($pos, $read) = 0;
                 do {
                         defined($read = read $fh, ${$buf}, $size - $pos, $pos) or croak "Couldn't read $file: $!";
@@ -134,7 +133,7 @@ Content-Type',"application/x-download;name=test.text
         else {
                 $buf = do { local $/; <$fh> };
         }
-  }; 
+  };
   if ($@) {
     print STDERR "ERROR! [$@]";
     return get_500($@);
@@ -185,5 +184,5 @@ return qq~HTTP/1.0 404 Not Found
 Internal server error!
 $msg
   ~;
-  
+
 }
