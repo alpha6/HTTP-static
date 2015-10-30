@@ -149,9 +149,9 @@ sub _get_file_list {
   my $header = q~HTTP/1.0 200 OK
 Content-Type: text/html;
 
-<html><head></head><body>~;
+<html><head><style>.page-content { width: 400px; margin: 0 auto; border: 1px solid black; border-radius: 5px; padding: 5px 20px 30px } a {color: black } p { margin: 0; padding: 5px; } p:nth-child(even) {background: #D4F1D4}  </style></head><body><div class="page-content">~;
 
-  my $footer = q~</body></html>~;
+  my $footer = q~</div></body></html>~;
 
   my $content;
   for my $f (@$files_list) {
