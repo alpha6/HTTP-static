@@ -1,2 +1,2 @@
 # HTTP-static
-Slow, dirty server for serving static files
+Slow, dirty server to distribute static files
